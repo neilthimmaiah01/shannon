@@ -73,6 +73,14 @@ RUN apk update && apk add --no-cache \
     # Font rendering
     fontconfig
 
+# First install the latest pip version
+# Next install Semgrep for static taint analysis
+RUN python3 -m ensurepip --upgrade 2>/dev/null; \
+    python3 -m pip install semgrep==1.70.0
+
+# Copy the rules for Semgrep into the image
+COPY apps/worker/prompts/rules/ /opt/shannon/rules/
+
 # Create non-root user
 RUN addgroup -g 1001 pentest && \
     adduser -u 1001 -G pentest -s /bin/bash -D pentest
