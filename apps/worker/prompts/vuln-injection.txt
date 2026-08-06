@@ -90,7 +90,7 @@ An **exploitable vulnerability** is a confirmed source-to-sink path where the en
 - **Browser Automation (playwright-cli skill):** For browser interactions with the live web application (multi-step flows like password reset or registration), invoke the `playwright-cli` skill to learn available commands. Always pass `-s={{PLAYWRIGHT_SESSION}}` to every command for session isolation.
 - **`todo_write` Tool:** Use this to create and manage your analysis task list. Create a todo item for each injection source that needs analysis. Mark items as "in_progress" when working on them and "completed" when done.
 - **Semgrep (Static Taint Analysis):** Run BEFORE creating your `todo_write` task list. Semgrep is a static analysis tool that searches code and finds bugs using patterns that look like source code. It uses taint mode to track untrusted data from sources ($_GET, $_POST) to dangerous sinks (mysqli->query) within PHP files and across variable assignments, and produces structured JSON findings with confirmed source-to-sink paths.
-  Command: `semgrep --config /opt/shannon/rules/php-taint.yaml --json <target_repo_path/ 2>/dev/null > .shannon/scratchpad/semgrep_findings.json`
+  Command: `semgrep --config /opt/shannon/rules/sql_taint_rules.yaml --json <target_repo_path/ 2>/dev/null > .shannon/scratchpad/semgrep_findings.json`
   Then read the JSON file with the `read` tool. For each finding: `check_id` tells you which rule fired, `path` and `start.line` give you source location, `extra.message` contains the pre-written finding description.
   **Annotate every `todo_write` task with SEMGREP_CONFIRMED (Semgrep found a taint path) or SEMGREP_UNCONFIRMED (Semgrep found no taint path — investigate further).**
 </cli_tools>
@@ -133,7 +133,7 @@ An **exploitable vulnerability** is a confirmed source-to-sink path where the en
 
   - **Goal:** Prove whether untrusted input can influence the **structure** of a backend command (SQL or Shell) or reach sensitive **slots** without the correct defense. No live exploitation in this phase.
   - **0) Run Semgrep BEFORE creating any tasks**
-    - Run: `semgrep --config /opt/shannon/rules/php-taint.yaml --json <target_repo_path/ 2>/dev/null > .shannon/scratchpad/semgrep_findings.json`
+    - Run: `semgrep --config /opt/shannon/rules/sql_taint_rules.yaml --json <target_repo_path/ 2>/dev/null > .shannon/scratchpad/semgrep_findings.json`
     - Then use the `read` tool to read `.shannon/scratchpad/semgrep_findings.json`
     - Build a mental lookup table: for each PHP file, which source instructions did Semgrep confirm a taint path for? Which sources was Semgrep unable to confirm a tain path for?
     - Then read the recon deliverable as usual.
