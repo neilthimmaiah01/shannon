@@ -1,0 +1,59 @@
+rules:
+  - id: sql_string_context
+    languages: [php]
+    severity: ERROR
+    message: >
+      SQLi: tainted input flows to mysqli->query() without sanitization
+      Slot: SQL-val
+      Sanitization observed: NONE
+      Witness payload: ' OR '1'='1
+    mode: taint
+
+    pattern-sources:
+      - pattern: $_GET[...]
+      - pattern: $_POST[...]
+      - pattern: $_REQUEST[...]
+
+    pattern-sanitizers:
+      - pattern: intval(...)
+      - pattern: (int)(...)
+      - pattern: mysqli_real_escape_string(...)
+      - pattern: $conn->real_escape_string(...)
+      - pattern: htmlspecialchars(...)
+
+    pattern-sinks:
+      - pattern: $conn->query(...)
+      - pattern: $conn->multi_query(...)
+      - pattern: mysqli_query(...)
+
+    metadata:
+      shannon_vuln_class: SQLi
+      shannon_slot_type: SQL-val
+
+
+  - id: sql_numeric_context
+    languages: [php]
+    severity: ERROR
+    message: >
+      SQLi: tainted input used as an unquoted numeric value within a SQL query without intval() or (int) sanitization
+      Slot: SQL-num
+      Witness payload: OR 1=1
+    mode: taint
+
+    pattern-sources:
+      - pattern: $_GET[...]
+      - pattern: $_POST[...]
+      - pattern: $_REQUEST[...]
+
+    pattern-sanitizers:
+      - pattern: intval(...)
+      - pattern: (int)(...)
+      - pattern: abs(...)
+
+    pattern-sinks:
+      - pattern: $conn->query(...)
+      - pattern: mysqli_query(...)
+
+    metadata:
+      shannon_vuln_class: SQLi
+      shannon_slot_type: SQL-num
