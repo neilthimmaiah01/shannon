@@ -93,6 +93,10 @@ An **exploitable vulnerability** is a confirmed source-to-sink path where the en
   Command: `semgrep --config /opt/shannon/rules/sql_taint_rules.yaml --json <target_repo_path/ 2>/dev/null > .shannon/scratchpad/semgrep_findings.json`
   Then read the JSON file with the `read` tool. For each finding: `check_id` tells you which rule fired, `path` and `start.line` give you source location, `extra.message` contains the pre-written finding description.
   **Annotate every `todo_write` task with SEMGREP_CONFIRMED (Semgrep found a taint path) or SEMGREP_UNCONFIRMED (Semgrep found no taint path — investigate further).**
+- **Joern CPG (Interprocedural Taint Analysis):** Run AFTER Semgrep and BEFORE creating your `todo_write` task list. Joern builds a Code Property Graph across all PHP files and extracts cross-file usage slices showing how data flows between functions.
+  Command: `JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8" /opt/joern/joern-cli/frontends/php2cpg/bin/php2cpg <target_repo_path> -o /tmp/shannon-cpg.bin 2>/dev/null && /opt/joern/joern-cli/joern-slice usages -o .shannon/scratchpad/cpg-slice.json /tmp/shannon-cpg.bin 2>/dev/null`
+  Then read `.shannon/scratchpad/cpg-slice.json` with the `read` tool. For each entry: `fileName` and `lineNumber` locate the function, `definedBy` shows how variables are defined, `invokedCalls` shows what functions are called inside, `argToCalls` shows what arguments flow into calls.
+  **Annotate every `todo_write` task with CPG_CONFIRMED (CPG slice shows taint flows to a dangerous sink) or CPG_UNCONFIRMED (CPG slice shows sanitization or path is absent).**
 </cli_tools>
 
 <data_format_specifications>
@@ -138,6 +142,11 @@ An **exploitable vulnerability** is a confirmed source-to-sink path where the en
     - Build a mental lookup table: for each PHP file, which source instructions did Semgrep confirm a taint path for? Which sources was Semgrep unable to confirm a tain path for?
     - Then read the recon deliverable as usual.
     - When creating `todo_write` tasks in step 1, annotate each with SEMGREP_CONFIRMED or SEMGREP_UNCONFIRMED based on your lookup table.
+  - **0b) Build CPG and extract usage slices**
+    - Run: `JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8" /opt/joern/joern-cli/frontends/php2cpg/bin/php2cpg <target_repo_path> -o /tmp/shannon-cpg.bin 2>/dev/null && /opt/joern/joern-cli/joern-slice usages -o .shannon/scratchpad/cpg-slice.json /tmp/shannon-cpg.bin 2>/dev/null`
+    - Then read `.shannon/scratchpad/cpg-slice.json` with the `read` tool.
+    - Cross-reference CPG slice findings with Semgrep findings. The CPG catches cross-file taint paths that Semgrep's file boundary misses.
+    - When creating `todo_write` tasks in step 1, annotate each with CPG_CONFIRMED or CPG_UNCONFIRMED in addition to the SEMGREP annotation.
   - **1) Create a To Do for each Injection Source found in the Pre-Recon Deliverable
 		  - inside of .shannon/deliverables/pre_recon_deliverable.md under the section "7. Injection Sources (Command Injection and SQL Injection)" use the `todo_write` tool to create a task for each discovered Injection Source. 
 		  - Note: All sources are marked as Tainted until they Hit a Santiization that matches the sink context. normalizers (lowercasing, trimming, JSON parse, schema decode) — still **tainted**.
