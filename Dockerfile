@@ -71,15 +71,44 @@ RUN apk update && apk add --no-cache \
     libxrandr \
     mesa-gbm \
     # Font rendering
-    fontconfig
+    fontconfig \
+    unzip \
+    glibc-locale-en \ 
+    php-8.1 
 
-# First install the latest pip version
-# Next install Semgrep for static taint analysis
+# Install Semgrep for static taint analysis
 RUN python3 -m ensurepip --upgrade 2>/dev/null; \
     python3 -m pip install semgrep==1.70.0
 
-# Copy the rules for Semgrep into the image
+# Copy Shannon's custom Semgrep rules into the image
 COPY apps/worker/prompts/rules/ /opt/shannon/rules/
+
+# Install Java 17 (Temurin aarch64 binary — required by Joern)
+RUN mkdir -p /opt/java && \
+    curl -L "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.10%2B7/OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.10_7.tar.gz" \
+    -o /tmp/jdk.tar.gz && \
+    tar -xzf /tmp/jdk.tar.gz -C /opt/java --strip-components=1 && \
+    rm /tmp/jdk.tar.gz
+ENV JAVA_HOME=/opt/java
+ENV PATH="/opt/java/bin:$PATH"
+
+# Install Joern CPG tool
+RUN mkdir -p /opt/joern /usr/local/bin && \
+    curl -L "https://github.com/joernio/joern/releases/download/v2.0.406/joern-cli.zip" \
+    -o /tmp/joern-cli.zip && \
+    unzip /tmp/joern-cli.zip -d /opt/joern && \
+    rm /tmp/joern-cli.zip && \
+    ln -sf /opt/joern/joern-cli/joern /usr/local/bin/joern && \
+    ln -sf /opt/joern/joern-cli/joern-parse /usr/local/bin/joern-parse
+
+# Patch php-parser phar to fix $argv issue in PHP 8.x
+RUN php -d phar.readonly=0 /opt/joern/joern-cli/frontends/php2cpg/bin/php-parser/php-parser-4.15.8.phar 2>/dev/null; \
+    sed -i 's/list(\$operations, \$files, \$attributes) = parseArgs(\$argv);/global \$argv; list(\$operations, \$files, \$attributes) = parseArgs(\$argv);/' \
+    /tmp/pharextract/php-parser-4.15.8/bin/php-parse && \
+    cp /opt/joern/joern-cli/frontends/php2cpg/bin/php-parser/php-parser.php \
+    /opt/joern/joern-cli/frontends/php2cpg/bin/php-parser/php-parser.php.bak && \
+    echo '<?php require("/tmp/pharextract/php-parser-4.15.8/bin/php-parse");?>' > \
+    /opt/joern/joern-cli/frontends/php2cpg/bin/php-parser/php-parser.php
 
 # Create non-root user
 RUN addgroup -g 1001 pentest && \
@@ -135,6 +164,10 @@ ENV npm_config_cache=/tmp/.npm
 ENV HOME=/tmp
 ENV XDG_CACHE_HOME=/tmp/.cache
 ENV XDG_CONFIG_HOME=/tmp/.config
+ENV NODE_ENV=production
+ENV PATH="/usr/local/bin:$PATH"
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["node", "apps/worker/dist/temporal/worker.js"]
